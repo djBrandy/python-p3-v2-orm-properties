@@ -1,28 +1,79 @@
-# lib/employee.py
+# Importing the cursor and connection from the __init__ file
 from __init__ import CURSOR, CONN
+# Importing the Department class from the department module
 from department import Department
 
-
+# The Employee class represents an employee in the organization
 class Employee:
 
-    # Dictionary of objects saved to the database.
+    # A dictionary to store all employee objects with their id as the key
     all = {}
 
+    # The constructor for the Employee class
     def __init__(self, name, job_title, department_id, id=None):
+        # The id, name, job title, and department id attributes for an employee
         self.id = id
         self.name = name
         self.job_title = job_title
         self.department_id = department_id
 
+    # The string representation of the employee object
     def __repr__(self):
         return (
             f"<Employee {self.id}: {self.name}, {self.job_title}, " +
             f"Department ID: {self.department_id}>"
         )
+    
+    # Getter for the name attribute
+    @property
+    def name(self):
+        return self._name
 
+    # Setter for the name attribute
+    @name.setter
+    def name(self, name):
+        # Check if the name is a non-empty string
+        if isinstance(name, str) and len(name):
+            self._name = name
+        else:
+            raise ValueError(
+                "Name must be a non-empty string"
+            )
+
+    # Getter for the job title attribute
+    @property
+    def job_title(self):
+        return self._job_title
+
+    # Setter for the job title attribute
+    @job_title.setter
+    def job_title(self, job_title):
+        # Check if the job title is a non-empty string
+        if isinstance(job_title, str) and len(job_title):
+            self._job_title = job_title
+        else:
+            raise ValueError(
+                "job_title must be a non-empty string"
+            )
+
+    # Getter for the department id attribute
+    @property
+    def department_id(self):
+        return self._department_id
+
+    # Setter for the department id attribute
+    @department_id.setter
+    def department_id(self, department_id):
+        # Check if the department id is an integer and references a department in the database
+        if type(department_id) is int and Department.find_by_id(department_id):
+            self._department_id = department_id
+        else:
+            raise ValueError(
+                "department_id must reference a department in the database")
+
+    # Class method to create a new table for the Employee class
     @classmethod
     def create_table(cls):
-        """ Create a new table to persist the attributes of Employee instances """
         sql = """
             CREATE TABLE IF NOT EXISTS employees (
             id INTEGER PRIMARY KEY,
@@ -34,19 +85,17 @@ class Employee:
         CURSOR.execute(sql)
         CONN.commit()
 
+    # Class method to drop the table for the Employee class
     @classmethod
     def drop_table(cls):
-        """ Drop the table that persists Employee instances """
         sql = """
             DROP TABLE IF EXISTS employees;
         """
         CURSOR.execute(sql)
         CONN.commit()
 
+    # Method to save an employee object to the database
     def save(self):
-        """ Insert a new row with the name, job title, and department id values of the current Employee object.
-        Update object id attribute using the primary key value of new row.
-        Save the object in local dictionary using table row's PK as dictionary key"""
         sql = """
                 INSERT INTO employees (name, job_title, department_id)
                 VALUES (?, ?, ?)
@@ -55,11 +104,13 @@ class Employee:
         CURSOR.execute(sql, (self.name, self.job_title, self.department_id))
         CONN.commit()
 
+        # Update the id of the employee object with the id of the new row
         self.id = CURSOR.lastrowid
+        # Add the employee object to the dictionary
         type(self).all[self.id] = self
 
+    # Method to update an employee object in the database
     def update(self):
-        """Update the table row corresponding to the current Employee instance."""
         sql = """
             UPDATE employees
             SET name = ?, job_title = ?, department_id = ?
@@ -69,10 +120,8 @@ class Employee:
                              self.department_id, self.id))
         CONN.commit()
 
+    # Method to delete an employee object from the database
     def delete(self):
-        """Delete the table row corresponding to the current Employee instance,
-        delete the dictionary entry, and reassign id attribute"""
-
         sql = """
             DELETE FROM employees
             WHERE id = ?
@@ -81,40 +130,39 @@ class Employee:
         CURSOR.execute(sql, (self.id,))
         CONN.commit()
 
-        # Delete the dictionary entry using id as the key
+        # Delete the employee object from the dictionary
         del type(self).all[self.id]
 
-        # Set the id to None
+        # Set the id of the employee object to None
         self.id = None
 
+    # Class method to create a new employee object and save it to the database
     @classmethod
     def create(cls, name, job_title, department_id):
-        """ Initialize a new Employee instance and save the object to the database """
         employee = cls(name, job_title, department_id)
         employee.save()
         return employee
 
+    # Class method to create an employee object from a row in the database
     @classmethod
     def instance_from_db(cls, row):
-        """Return an Employee object having the attribute values from the table row."""
-
-        # Check the dictionary for  existing instance using the row's primary key
+        # Check if an employee object with the same id already exists
         employee = cls.all.get(row[0])
         if employee:
-            # ensure attributes match row values in case local instance was modified
+            # Update the attributes of the employee object
             employee.name = row[1]
             employee.job_title = row[2]
             employee.department_id = row[3]
         else:
-            # not in dictionary, create new instance and add to dictionary
+            # Create a new employee object and add it to the dictionary
             employee = cls(row[1], row[2], row[3])
             employee.id = row[0]
             cls.all[employee.id] = employee
         return employee
 
+    # Class method to get all employee objects from the database
     @classmethod
     def get_all(cls):
-        """Return a list containing one Employee object per table row"""
         sql = """
             SELECT *
             FROM employees
@@ -122,11 +170,12 @@ class Employee:
 
         rows = CURSOR.execute(sql).fetchall()
 
+        # Create an employee object for each row in the database
         return [cls.instance_from_db(row) for row in rows]
 
+    # Class method to find an employee object by id
     @classmethod
     def find_by_id(cls, id):
-        """Return Employee object corresponding to the table row matching the specified primary key"""
         sql = """
             SELECT *
             FROM employees
@@ -134,11 +183,12 @@ class Employee:
         """
 
         row = CURSOR.execute(sql, (id,)).fetchone()
+        # Return the employee object if it exists, otherwise return None
         return cls.instance_from_db(row) if row else None
 
+    # Class method to find an employee object by name
     @classmethod
     def find_by_name(cls, name):
-        """Return Employee object corresponding to first table row matching specified name"""
         sql = """
             SELECT *
             FROM employees
@@ -146,4 +196,5 @@ class Employee:
         """
 
         row = CURSOR.execute(sql, (name,)).fetchone()
+        # Return the employee object if it exists, otherwise return None
         return cls.instance_from_db(row) if row else None
